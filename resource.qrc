@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/image">
+        <file>logo.png</file>
+        <file>danmaku-icon.png</file>
+    </qresource>
+</RCC>
