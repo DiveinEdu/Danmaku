@@ -26,10 +26,13 @@ private slots:
     void processSubscribeDanmakuResponse();
     void networkErrorOccured(QNetworkReply::NetworkError code);
     void pullDanmaku();
+    void cancelSubscribe();
+    void restartSubscribeTimer();
 private:
     QString _server, _channel, _password, _uuid;
     QTimer  *subscribeTimer;
     QNetworkAccessManager *networkAccessManager;
+    QNetworkReply *currentReply;
     bool _needToPull;
 };
 

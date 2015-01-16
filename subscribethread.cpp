@@ -44,16 +44,6 @@ void SubscribeThread::setPassword(QString &password)
 void SubscribeThread::run()
 {
 
-
-#if 0
-    this->subscribeTimer = new QTimer();
-    this->subscribeTimer->setInterval(2000);
-    connect(this->subscribeTimer, SIGNAL(timeout()), this, SLOT(pullDanmaku()));
-    this->subscribeTimer->start();
-#else
-//    this->pullDanmaku();
-#endif
-
     this->exec();
 
 }
@@ -82,11 +72,22 @@ void SubscribeThread::subscribeDanmaku(QString &url)
 
 
     QNetworkReply *reply = networkAccessManager->get(request);
-
+    this->currentReply = reply;
     connect(reply, SIGNAL(finished()), this, SLOT(processSubscribeDanmakuResponse()));
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(networkErrorOccured(QNetworkReply::NetworkError)));
+    connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this, SLOT(restartSubscribeTimer()), Qt::QueuedConnection);
+    connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(restartSubscribeTimer()), Qt::QueuedConnection);
 
+    if(this->subscribeTimer){
+        this->subscribeTimer->stop();
+        delete this->subscribeTimer;
+        this->subscribeTimer = NULL;
+    }
+    this->subscribeTimer = new QTimer();
+    this->subscribeTimer->setInterval(1000*12);
+    connect(this->subscribeTimer, SIGNAL(timeout()), this, SLOT(cancelSubscribe()));
 
+    this->subscribeTimer->start();
 }
 
 void SubscribeThread::switchPullStatus(bool on)
@@ -168,10 +169,14 @@ void SubscribeThread::processSubscribeDanmakuResponse()
         }
     }
 out:
-
-    reply->deleteLater();
     qApp->processEvents(QEventLoop::AllEvents);
-    this->pullDanmaku();
+    if(reply->error() == QNetworkReply::NoError){
+        this->pullDanmaku();
+    }else
+    {
+        QTimer::singleShot(2000,this,SLOT(pullDanmaku()));
+    }
+    reply->deleteLater();
     return;
 }
 
@@ -182,6 +187,7 @@ void SubscribeThread::networkErrorOccured(QNetworkReply::NetworkError code)
     qDebug()<<Q_FUNC_INFO<<reply->errorString();
 
     reply->deleteLater();
+    this->currentReply = NULL;
     qApp->processEvents(QEventLoop::AllEvents);
 
 }
@@ -195,6 +201,22 @@ void SubscribeThread::pullDanmaku()
         this->subscribeDanmakuChannel(this->_channel);
 
     }else{
-        QTimer::singleShot(10,this,SLOT(pullDanmaku()));
+        QTimer::singleShot(1000,this,SLOT(pullDanmaku()));
     }
+}
+
+void SubscribeThread::cancelSubscribe()
+{
+    qDebug()<<Q_FUNC_INFO;
+    if(this->currentReply){
+        delete this->currentReply;
+        this->currentReply = NULL;
+    }
+    this->pullDanmaku();
+}
+
+void SubscribeThread::restartSubscribeTimer()
+{
+    this->subscribeTimer->stop();
+    this->subscribeTimer->start();
 }
